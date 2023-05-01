@@ -1,12 +1,10 @@
-import logging
-
 import os
 
-import telegram
+import logging
 
-from telegram.ext import Updater, CommandHandler
+import genshinstats as gs
 
-import genshinstats as GS
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
 # Set up logging
 
@@ -14,81 +12,91 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
                     level=logging.INFO)
 
-logger = logging.getLogger(__name__)
+# Set up the GenshinStats client
 
-# Set up the Genshin Impact stats API wrapper
+client = gs.GenshinClient("stanoelle", "apurba2007@das")
 
-gs = GS(os.environ.get('GENSHIN_USERNAME'), os.environ.get('GENSHIN_PASSWORD'))
-
-# Define a function to handle the /start command
+# Define the command handlers
 
 def start(update, context):
 
-    context.bot.send_message(chat_id=update.effective_chat.id, text="Hi there! Use /stats <username> to see Genshin Impact stats.")
+    """Send a welcome message when the command /start is issued."""
 
-# Define a function to handle the /stats command
+    update.message.reply_text('Hi! I am a Genshin Impact stats bot. Send me a player UID to get their stats!')
 
-def stats(update, context):
+def help(update, context):
 
-    # Get the player's username from the command argument
+    """Send a help message when the command /help is issued."""
 
-    username = context.args[0]
+    update.message.reply_text('Send me a player UID to get their stats!')
 
-    # Fetch the player's stats
+def echo(update, context):
+
+    """Search for the player with the given UID and display their stats."""
+
+    uid = update.message.text
 
     try:
 
-        player_stats = gs.get_user_stats(username)
+        player_data = client.get_user_stats(uid=uid)
 
-    except Exception as e:
+        message = f"Stats for UID {uid}:\n"
 
-        logger.error(f"Error fetching stats for {username}: {e}")
+        message += f"Adventure Rank: {player_data.stats['general_stats']['highest_level']}\n"
 
-        context.bot.send_message(chat_id=update.effective_chat.id, text=f"Error fetching stats for {username}. Please check if the username is correct and try again.")
+        message += f"Abyss Floor: {player_data.stats['spiral_abyss']['total_battles']} (Highest: {player_data.stats['spiral_abyss']['highest_floor']}F)\n"
+
+        update.message.reply_text(message)
+
+    except gs.errors.GenshinStatsError:
+
+        update.message.reply_text("Player not found. Please check the UID and try again.")
+
+def error(update, context):
+
+    """Log the error message."""
+
+    logging.error(f"Update {update} caused error {context.error}")
+
+def main():
+
+    """Start the bot."""
+
+    # Get the Telegram bot token from the environment variable
+
+    bot_token = os.environ.get('BOT_TOKEN')
+
+    if bot_token is None:
+
+        logging.error("Please set the BOT_TOKEN environment variable.")
 
         return
 
-    # Create a formatted message with the player's stats
+    # Set up the Telegram bot updater and dispatcher
 
-    message = f"Stats for {username}:\n\n"
+    updater = Updater(bot_token, use_context=True)
 
-    message += f"Adventure Rank: {player_stats['stats']['level']} ({player_stats['stats']['progress']}%)\n"
+    dp = updater.dispatcher
 
-    message += f"Total Playtime: {player_stats['stats']['active_days']} days, {player_stats['stats']['active_hours']} hours\n"
+    # Add the command and message handlers
 
-    message += f"Abyssal Stars: {player_stats['stats']['spiral_abyss']['total_star']} stars\n"
+    dp.add_handler(CommandHandler('start', start))
 
-    message += f"Anemoculus: {player_stats['exploration']['anemoculus']} / 65\n"
+    dp.add_handler(CommandHandler('help', help))
 
-    message += f"Geoculus: {player_stats['exploration']['geoculus']} / 131\n"
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
 
-    message += f"Daily Check-ins: {player_stats['stats']['total_sign_day']} / 180\n"
+    # Log all errors
 
-    message += f"Spiral Abyss Floor {player_stats['stats']['spiral_abyss']['highest_floor']} - {player_stats['stats']['spiral_abyss']['highest_room']}"
+    dp.add_error_handler(error)
 
-    # Send the message to the chat
+    # Start the bot
 
-    context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+    updater.start_polling()
 
-# Set up the Telegram bot
+    updater.idle()
 
-bot = telegram.Bot(token=os.environ.get('TELEGRAM_TOKEN'))
+if __name__ == '__main__':
 
-updater = Updater(token=os.environ.get('TELEGRAM_TOKEN'), use_context=True)
-
-dispatcher = updater.dispatcher
-
-# Add the command handlers
-
-dispatcher.add_handler(CommandHandler('start', start))
-
-dispatcher.add_handler(CommandHandler('stats', stats))
-
-# Start the bot
-
-updater.start_polling()
-
-# Keep the bot running until stopped manually
-
-updater.idle()
+    main()
 
