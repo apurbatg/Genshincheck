@@ -2,7 +2,7 @@ import os
 
 import logging
 
-from genshinstats import api as gsapi, spiral
+from genshinstats import client as gsclient
 
 from genshinstats.errors import GenshinStatsError
 
@@ -36,13 +36,13 @@ def echo(update, context):
 
     try:
 
-        player_data = gsapi.get_user_stats(uid)
+        player_data = gsclient.get_user_stats(uid)
 
         message = f"Stats for UID {uid}:\n"
 
         message += f"Adventure Rank: {player_data['stats']['level']}\n"
 
-        message += f"Abyss Floor: {spiral.get_total_spiral_battles(uid)} (Highest: {spiral.get_highest_floor(uid)}F)\n"
+        message += f"Spiral Abyss: Floor {player_data['stats']['spiral_abyss']['floor']} - Chamber {player_data['stats']['spiral_abyss']['max_floor']} ({player_data['stats']['spiral_abyss']['total_star']}⭐)\n"
 
         update.message.reply_text(message)
 
