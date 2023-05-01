@@ -52,9 +52,9 @@ def search(update, context):
 
 updater = Updater(token=TOKEN, use_context=True)
 
-updater.dispatcher.add_handler(telegram.CommandHandler('start', start))
+updater.dispatcher.add_handler('start', start)
 
-updater.dispatcher.add_handler(telegram.CommandHandler('search', search))
+updater.dispatcher.add_handler('search', search)
 
 updater.start_polling()
 
