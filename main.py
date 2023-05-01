@@ -1,8 +1,14 @@
 import logging
 
-import requests
+import os
+
+import telegram
 
 from telegram.ext import Updater, CommandHandler
+
+from genshinstats import GS
+
+# Set up logging
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 
@@ -10,117 +16,79 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
+# Set up the Genshin Impact stats API wrapper
+
+gs = GS(os.environ.get('GENSHIN_USERNAME'), os.environ.get('GENSHIN_PASSWORD'))
+
+# Define a function to handle the /start command
+
 def start(update, context):
 
-    """Send a message when the command /start is issued."""
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Hi there! Use /stats <username> to see Genshin Impact stats.")
 
-    context.bot.send_message(chat_id=update.effective_chat.id, text='Hi! I am a Genshin Impact stats bot. Use /stats <player_name> <server> to see a player\'s stats.')
+# Define a function to handle the /stats command
 
 def stats(update, context):
 
-    """Fetch player stats and send them as a message."""
+    # Get the player's username from the command argument
 
-    if not context.args:
+    username = context.args[0]
 
-        context.bot.send_message(chat_id=update.effective_chat.id, text="Please enter a player name and server. Usage: /stats <player_name> <server>")
-
-        return
-
-    
-
-    player_name = context.args[0]
-
-    valid_servers = ["america", "europe", "asia"]
-
-    server = context.args[-1].lower()
-
-    
-
-    if server not in valid_servers:
-
-        context.bot.send_message(chat_id=update.effective_chat.id, text="Invalid server code. Valid codes are: america, europe, asia")
-
-        return
-
-    
+    # Fetch the player's stats
 
     try:
 
-        response = requests.get(f'https://api.genshin.dev/players/{player_name}/stats?server={server}')
+        player_stats = gs.get_user_stats(username)
 
-        response.raise_for_status()
+    except Exception as e:
 
-    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching stats for {username}: {e}")
 
-        context.bot.send_message(chat_id=update.effective_chat.id, text=f"Error fetching stats for {player_name}: {e}")
-
-        logger.error(f"Error fetching stats for {player_name}: {e}")
+        context.bot.send_message(chat_id=update.effective_chat.id, text=f"Error fetching stats for {username}. Please check if the username is correct and try again.")
 
         return
 
-    
+    # Create a formatted message with the player's stats
 
-    if response.status_code == 200:
+    message = f"Stats for {username}:\n\n"
 
-        stats = response.json()
+    message += f"Adventure Rank: {player_stats['stats']['level']} ({player_stats['stats']['progress']}%)\n"
 
-        if not stats['data']:
+    message += f"Total Playtime: {player_stats['stats']['active_days']} days, {player_stats['stats']['active_hours']} hours\n"
 
-            message = f"Error: player {player_name} not found on {server.capitalize()} server"
+    message += f"Abyssal Stars: {player_stats['stats']['spiral_abyss']['total_star']} stars\n"
 
-        else:
+    message += f"Anemoculus: {player_stats['exploration']['anemoculus']} / 65\n"
 
-            message = f"Stats for {player_name}:\nAdventure Rank: {stats['data']['stats']['level']} ({stats['data']['stats']['achievement_points']} achievement points)\nAnemoculus found: {stats['data']['world_exploration']['anemoculus']}\nGeoculus found: {stats['data']['world_exploration']['geoculus']}"
+    message += f"Geoculus: {player_stats['exploration']['geoculus']} / 131\n"
 
-    else:
+    message += f"Daily Check-ins: {player_stats['stats']['total_sign_day']} / 180\n"
 
-        message = f"Error fetching stats for {player_name}: {response.status_code} {response.reason}"
+    message += f"Spiral Abyss Floor {player_stats['stats']['spiral_abyss']['highest_floor']} - {player_stats['stats']['spiral_abyss']['highest_room']}"
 
-    
+    # Send the message to the chat
 
     context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
-def help_command(update, context):
+# Set up the Telegram bot
 
-    """Send a message when the command /help is issued."""
+bot = telegram.Bot(token=os.environ.get('TELEGRAM_TOKEN'))
 
-    commands = ['/start', '/stats <player_name> <server>']
+updater = Updater(token=os.environ.get('TELEGRAM_TOKEN'), use_context=True)
 
-    help_text = "Here are the available commands:\n"
+dispatcher = updater.dispatcher
 
-    for command in commands:
+# Add the command handlers
 
-        help_text += f"{command}\n"
+dispatcher.add_handler(CommandHandler('start', start))
 
-    context.bot.send_message(chat_id=update.effective_chat.id, text=help_text)
+dispatcher.add_handler(CommandHandler('stats', stats))
 
-def main():
+# Start the bot
 
-    """Start the bot."""
+updater.start_polling()
 
-    TOKEN = '6044506381:AAHrrqTk02jqPtIzHjdCbOzz3S1cZIv7Cx4'
+# Keep the bot running until stopped manually
 
-    # Create the Updater and pass it the bot's token.
-
-    updater = Updater(token=TOKEN, use_context=True)
-
-    # Add command handlers
-
-    updater.dispatcher.add_handler(CommandHandler('start', start))
-
-    updater.dispatcher.add_handler(CommandHandler('stats', stats))
-
-    updater.dispatcher.add_handler(CommandHandler('help', help_command))
-
-    # Start the bot
-
-    updater.start_polling()
-
-    logger.info("Bot started")
-
-    updater.idle()
-
-if __name__ == '__main__':
-
-    main()
+updater.idle()
 
