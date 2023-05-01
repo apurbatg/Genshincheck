@@ -84,7 +84,7 @@ def main():
 
     """Start the bot."""
 
-    TOKEN = '6044506381:AAG3kiq3wmvg0EYAj3PiXkmaPm9uwUNU9yU'
+    TOKEN = '6044506381:AAHrrqTk02jqPtIzHjdCbOzz3S1cZIv7Cx4'
 
     # Create the Updater and pass it the bot's token.
 
