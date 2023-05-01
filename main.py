@@ -6,7 +6,7 @@ import telegram
 
 from telegram.ext import Updater, CommandHandler
 
-from genshinstats import GS
+import genshinstats as GS
 
 # Set up logging
 
