@@ -1,62 +1,47 @@
-import telegram
+import os
 
 import requests
 
-from telegram.ext import Updater, CommandHandler, MessageHandler
-
-from bs4 import BeautifulSoup
-
-TOKEN = '6044506381:AAG3kiq3wmvg0EYAj3PiXkmaPm9uwUNU9yU' # replace this with your Telegram bot token
-
-bot = telegram.Bot(token=TOKEN)
+from telegram.ext import Updater, CommandHandler
 
 def start(update, context):
 
-    context.bot.send_message(chat_id=update.effective_chat.id, text="Welcome to Genshin Stats Bot! Use /search <username> to search for a player's stats.")
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Welcome to the Genshin Impact stats bot! Type /stats <player_name> to get player stats.")
 
-def search(update, context):
+def stats(update, context):
 
-    try:
+    player_name = " ".join(context.args)
+    
+    server = "asia"
 
-        username = context.args[0]
+    api_url = f"https://api.wanshihe.com/genshin/stats?nickname={player_name}&server={server}"
 
-        url = f'https://genshin.honeyhunterworld.com/db/char/{username}/'
+    response = requests.get(api_url)
 
-        response = requests.get(url)
+    if response.status_code == 200:
 
-        soup = BeautifulSoup(response.content, 'html.parser')
+        stats = response.json()
 
-        stats = soup.find_all('td', class_='ui-table__td')
+        message = f"Stats for {player_name}:\nAdventure Rank: {stats['data']['stats']['level']} ({stats['data']['stats']['achievement_points']} achievement points)\nAnemoculus found: {stats['data']['world_exploration']['anemoculus']}\nGeoculus found: {stats['data']['world_exploration']['geoculus']}"
 
-        if not stats:
+    else:
 
-            context.bot.send_message(chat_id=update.effective_chat.id, text='Player not found!')
+        message = f"Error fetching stats for {player_name}: {response.status_code} {response.reason}"
 
-        else:
+    context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
-            name = stats[0].text
+if __name__ == '__main__':
 
-            level = stats[1].text
+    TOKEN = os.environ.get('TOKEN')
 
-            element = stats[2].text
+    updater = Updater(token=TOKEN, use_context=True)
 
-            weapon = stats[3].text
+    dispatcher = updater.dispatcher
 
-            constellation = stats[4].text
+    dispatcher.add_handler(CommandHandler('start', start))
 
-            context.bot.send_message(chat_id=update.effective_chat.id, text=f'Name: {name}\nLevel: {level}\nElement: {element}\nWeapon: {weapon}\nConstellation: {constellation}')
+    dispatcher.add_handler(CommandHandler('stats', stats))
 
-    except:
+    updater.start_polling()
 
-        context.bot.send_message(chat_id=update.effective_chat.id, text='Error. Please use /search <username> to search for a player\'s stats.')
-
-updater = Updater(token=TOKEN, use_context=True)
-
-updater.dispatcher.add_handler('start', start)
-
-updater.dispatcher.add_handler('search', search)
-
-updater.start_polling()
-
-updater.idle()
-
+    updater.idle()
