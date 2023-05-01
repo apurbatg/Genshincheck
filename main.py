@@ -80,6 +80,106 @@ def stats(update, context):
 
     context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
+import logging
+
+import requests
+
+from telegram.ext import Updater, CommandHandler
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+
+                    level=logging.INFO)
+
+logger = logging.getLogger(__name__)
+
+def start(update, context):
+
+    """Send a message when the command /start is issued."""
+
+    context.bot.send_message(chat_id=update.effective_chat.id, text='Hi! I am a Genshin Impact stats bot. Use /stats <player_name> <server> to see a player\'s stats.')
+
+def stats(update, context):
+
+    """Fetch player stats and send them as a message."""
+
+    if not context.args:
+
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Please enter a player name and server. Usage: /stats <player_name> <server>")
+
+        return
+
+    
+
+    player_name = context.args[0]
+
+    valid_servers = ["na", "eu", "asia", "cn"]
+
+    server = context.args[-1].lower()
+
+    
+
+    if server not in valid_servers:
+
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Invalid server code. Valid codes are: na, eu, asia, cn")
+
+        return
+
+    
+
+    try:
+
+        response = requests.get(f'https://api.genshin.honeyhunterworld.com/user/?nickname={player_name}&server={server}')
+
+        response.raise_for_status()
+
+    except requests.exceptions.RequestException as e:
+
+        context.bot.send_message(chat_id=update.effective_chat.id, text=f"Error fetching stats for {player_name}: {e}")
+
+        logger.error(f"Error fetching stats for {player_name}: {e}")
+
+        return
+
+    
+
+    data = response.json()
+
+    if not data or 'retcode' in data:
+
+        message = f"Error: player {player_name} not found on {server.capitalize()} server"
+
+    else:
+
+        stats = data['stats']
+
+        achievements = data['achievement_cnt']
+
+        spiral_abyss = data['spiral_abyss']
+
+        message = f"Stats for {player_name} on {server.capitalize()} server:\n\n"
+
+        message += f"Adventure Rank: {stats['level']} ({stats['achievement']} achievement points)\n"
+
+        message += f"Anemoculus found: {stats['anemoculus']} / {stats['anemoculus_total']}\n"
+
+        message += f"Geoculus found: {stats['geoculus']} / {stats['geoculus_total']}\n\n"
+
+        message += f"Achievements:\n"
+
+        for category, count in achievements.items():
+
+            message += f"{category}: {count}\n"
+
+        message += f"\nSpiral Abyss:\n"
+
+        message += f"Floors cleared: {spiral_abyss['total_floor']} / {spiral_abyss['total_floor']} (chambers: {spiral_abyss['total_chamber']})\n"
+
+        message += f"Highest floor reached: Floor {spiral_abyss['max_floor']} - Chamber {spiral_abyss['max_chamber']} ({spiral_abyss['max_star']} stars)\n"
+
+    
+
+    context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+
 def main():
 
     """Start the bot."""
