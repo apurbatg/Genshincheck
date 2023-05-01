@@ -2,6 +2,8 @@ import telegram
 
 import requests
 
+from telegram.ext import Updater
+
 from bs4 import BeautifulSoup
 
 TOKEN = '6044506381:AAG3kiq3wmvg0EYAj3PiXkmaPm9uwUNU9yU' # replace this with your Telegram bot token
@@ -48,7 +50,7 @@ def search(update, context):
 
         context.bot.send_message(chat_id=update.effective_chat.id, text='Error. Please use /search <username> to search for a player\'s stats.')
 
-updater = telegram.Updater(token=TOKEN, use_context=True)
+updater = Updater(token=TOKEN, use_context=True)
 
 updater.dispatcher.add_handler(telegram.CommandHandler('start', start))
 
