@@ -2,7 +2,9 @@ import os
 
 import logging
 
-import genshinstats as gs
+from genshinstats import api as gsapi, spiral
+
+from genshinstats.errors import GenshinStatsError
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
@@ -11,10 +13,6 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 
                     level=logging.INFO)
-
-# Set up the GenshinStats client
-
-client = gs.GenshinClient("stanoelle", "apurba2007@das")
 
 # Define the command handlers
 
@@ -38,17 +36,17 @@ def echo(update, context):
 
     try:
 
-        player_data = client.get_user_stats(uid=uid)
+        player_data = gsapi.get_user_stats(uid)
 
         message = f"Stats for UID {uid}:\n"
 
-        message += f"Adventure Rank: {player_data.stats['general_stats']['highest_level']}\n"
+        message += f"Adventure Rank: {player_data['stats']['level']}\n"
 
-        message += f"Abyss Floor: {player_data.stats['spiral_abyss']['total_battles']} (Highest: {player_data.stats['spiral_abyss']['highest_floor']}F)\n"
+        message += f"Abyss Floor: {spiral.get_total_spiral_battles(uid)} (Highest: {spiral.get_highest_floor(uid)}F)\n"
 
         update.message.reply_text(message)
 
-    except gs.errors.GenshinStatsError:
+    except GenshinStatsError:
 
         update.message.reply_text("Player not found. Please check the UID and try again.")
 
